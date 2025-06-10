@@ -158,8 +158,17 @@ llm-ner-system/
 - **Styling**: Modern dark theme with animations
 
 ## Demo
+Here are some screenshots demonstrating the system's functionality:
 
-[Include screenshots of your running application here]
+### Screenshot 1: Main Interface
+![Main Interface](screenshots/Screenshot%20(32).png)
+
+### Screenshot 2: Entity Detection
+![Entity Detection](screenshots/Screenshot%20(33).png)
+
+### Screenshot 3: Processing Results
+![Processing Results](screenshots/Screenshot%20(34).png)
+
 
 ## Future Enhancements
 

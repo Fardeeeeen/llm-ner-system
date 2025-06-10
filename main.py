@@ -102,6 +102,40 @@ def analyze_sentiment(text: str) -> str:
     else:
         return "Neutral"
 
+def extract_topics(text: str, num_topics: int = 2) -> List[str]:
+    """Extract topics using Gensim LDA"""
+    try:
+        doc = nlp(text)
+        tokens = [token.text.lower() for token in doc if not token.is_stop and token.is_alpha]
+        if len(tokens) < 5:  # Require minimum tokens for meaningful topics
+            logger.warning("Insufficient tokens for topic modeling")
+            return ["Insufficient text for topic modeling"]
+        
+        dictionary = corpora.Dictionary([tokens])
+        corpus = [dictionary.doc2bow(tokens)]
+        if not corpus[0]:  # Check if corpus is empty
+            logger.warning("Empty corpus after processing tokens")
+            return ["No topics detected"]
+        
+        # Reduce num_topics for short texts
+        effective_num_topics = min(num_topics, len(tokens) // 2) or 1
+        lda_model = LdaModel(
+            corpus,
+            num_topics=effective_num_topics,
+            id2word=dictionary,
+            passes=10,
+            random_state=42,
+            minimum_probability=0.0
+        )
+        topics = []
+        for topic_id in range(effective_num_topics):
+            words = [word for word, _ in lda_model.show_topic(topic_id, topn=5)]
+            topics.append(", ".join(words) if words else "No topic words")
+        logger.info(f"Extracted topics: {topics}")
+        return topics if topics else ["No topics detected"]
+    except Exception as e:
+        logger.error(f"Error extracting topics: {str(e)}")
+        return ["Topic modeling failed"]
 
 def summarize_text(text: str) -> str:
     """Summarize text using Hugging Face Transformers"""
@@ -207,17 +241,29 @@ async def process_prompt(request: PromptRequest):
         sentiment = analyze_sentiment(request.prompt)
         logger.info(f"Sentiment: {sentiment}")
         
+        # Step 3: Extract topics
+        topics = extract_topics(request.prompt)
+        logger.info(f"Topics: {topics}")
         
-        # Step 3: Summarize text
+        # Step 4: Summarize text
         summary = summarize_text(request.prompt)
         logger.info(f"Summary: {summary}")
         
+        # Step 5: Attempt to call Ollama LLM with a fallback
+        try:
+            logger.info(f"Sending prompt to Ollama ({request.model})...")
+            llm_response = call_ollama_api(request.prompt, request.model)
+        except Exception as e:
+            llm_response = f"LLM processing failed: {str(e)}. Please check Ollama service."
+            logger.error(f"Ollama API call failed: {str(e)}")
         
-        # Step 4: Return combined results
+        # Step 6: Return combined results
         response = ProcessResponse(
             original_prompt=request.prompt,
             entities=[EntityResponse(**entity) for entity in entities],
+            llm_response=llm_response,
             sentiment=sentiment,
+            topics=topics,
             summary=summary,
             success=True
         )

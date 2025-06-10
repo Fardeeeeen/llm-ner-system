@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrivChat – PII Detection</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <style>
+        :root {
+            /* Default dark theme */
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --border-color: #2a2a2a;
+            --text-primary: #E0E0E0;
+            --text-secondary: #888888;
+            --accent-color: #00ff66;
+            --accent-dark: #00cc52;
+        }
+
+        :root[data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f8f8;
+            --bg-tertiary: #f0f0f0;
+            --border-color: #e0e0e0;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --accent-color: #00cc52;
+            --accent-dark: #00aa44;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .theme-transition {
+            transition: all 0.3s ease;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--bg-primary);
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        .spinner-small {
+            width: 16px;
+            height: 16px;
+            border-width: 1.5px;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--accent-color)',
+                        'primary-dark': 'var(--accent-dark)',
+                        dark: {
+                            100: 'var(--border-color)',
+                            200: 'var(--bg-tertiary)',
+                            300: 'var(--bg-secondary)',
+                            400: 'var(--bg-primary)'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Theme toggle component
+        const ThemeToggle = ({ isDark, onToggle }) => (
+            <button 
+                onClick={onToggle}
+                className="text-secondary hover:text-primary transition-colors p-2 rounded-lg"
+                title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+                {isDark ? (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/>
+                    </svg>
+                ) : (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+                    </svg>
+                )}
+            </button>
+        );
+
+        const Sidebar = ({ activeChatSpace, onChatSpaceClick, isDark, onThemeToggle }) => (
+            <div className="w-72 bg-dark-200 border-r border-dark-100 flex flex-col h-screen theme-transition">
+                <div className="flex items-center justify-between px-5 py-6">
+                    <button className="flex flex-col gap-1 p-2 hover:opacity-80">
+                        <div className="w-4.5 h-0.5 bg-gray-600 rounded"></div>
+                        <div className="w-4.5 h-0.5 bg-gray-600 rounded"></div>
+                        <div className="w-4.5 h-0.5 bg-gray-600 rounded"></div>
+                    </button>
+                    <div className="text-xl font-bold text-primary">PrivChat</div>
+                    <ThemeToggle isDark={isDark} onToggle={onThemeToggle} />
+                </div>
+                
+                <div className="flex-1 px-5 space-y-2">
+                    {['Chat space 1', 'Chat space 2'].map((space, index) => (
+                        <button
+                            key={index}
+                            onClick={() => onChatSpaceClick(index)}
+                            className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-all theme-transition
+                                ${activeChatSpace === index 
+                                    ? 'border-2 border-primary text-primary bg-primary/10'
+                                    : 'border-2 border-transparent hover:border-dark-100 hover:text-primary'
+                                }`}
+                        >
+                            {space}
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+
+        const EntityHighlight = ({ entity, children }) => {
+            const getEntityClass = (label) => {
+                switch (label) {
+                    case 'PERSON': return 'bg-orange-500/30 text-orange-500 border border-orange-500/50';
+                    case 'GPE': 
+                    case 'LOCATION': return 'bg-blue-400/30 text-blue-400 border border-blue-400/50';
+                    case 'ORG': return 'bg-green-400/30 text-green-400 border border-green-400/50';
+                    default: return 'bg-gray-500/30 text-gray-500 border border-gray-500/50';
+                }
+            };
+
+            return (
+                <span className={`px-2 py-1 rounded font-semibold mx-0.5 ${getEntityClass(entity.label)}`}>
+                    {children}
+                </span>
+            );
+        };
+
+        const DetectionPanel = ({ entities, onClose }) => {
+            const getEntityTypeName = (label) => {
+                switch (label) {
+                    case 'PERSON': return 'Person Name';
+                    case 'GPE':
+                    case 'LOCATION': return 'Location';
+                    case 'ORG': return 'Organization';
+                    default: return label;
+                }
+            };
+
+            return (
+                <div className="bg-dark-200 border-t border-dark-100 p-5 max-h-[300px] overflow-y-auto theme-transition">
+                    <div className="flex items-center justify-between mb-5">
+                        <div className="text-primary text-base font-semibold">
+                            Detected PII (Sanitized before sending to API)
+                        </div>
+                        <div className="bg-primary/20 text-primary px-3 py-1 rounded-xl text-xs font-semibold">
+                            {entities.length} items
+                        </div>
+                        <button 
+                            onClick={onClose}
+                            className="hover:text-primary hover:bg-dark-100 p-1 rounded transition-colors"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {entities.map((entity, index) => (
+                            <div key={index} className="bg-dark-300 border border-dark-100 rounded-lg p-4 flex items-center justify-between theme-transition">
+                                <div>
+                                    <div className={`text-xs font-semibold uppercase tracking-wide mb-1
+                                        ${entity.label === 'PERSON' ? 'text-orange-500' : 
+                                        entity.label === 'GPE' || entity.label === 'LOCATION' ? 'text-blue-400' : 
+                                        entity.label === 'ORG' ? 'text-green-400' : 'text-gray-500'}`}>
+                                        {getEntityTypeName(entity.label)}
+                                    </div>
+                                    <div className="font-semibold">{entity.text}</div>
+                                </div>
+                                <div className="bg-yellow-600/20 text-yellow-500 px-2 py-1 rounded-xl text-xs font-semibold">
+                                    {Math.round(entity.confidence * 100)}%
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const LoadingSpinner = ({ size = "normal" }) => (
+            <div className={`spinner ${size === "small" ? "spinner-small" : ""}`} />
+        );
+
+        const SendButton = ({ onClick, isDisabled, isLoading }) => (
+            <button
+                onClick={onClick}
+                disabled={isDisabled}
+                className="bg-gradient-to-br from-primary to-primary-dark text-dark-400 px-6 py-4 rounded-xl font-semibold min-w-[100px] h-[56px] hover:translate-y-[-2px] hover:shadow-lg hover:shadow-primary/30 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none flex items-center justify-center"
+            >
+                {isLoading ? <LoadingSpinner /> : "Send"}
+            </button>
+        );
+
+        const App = () => {
+            const [activeChatSpace, setActiveChatSpace] = useState(0);
+            const [showInput, setShowInput] = useState(false);
+            const [prompt, setPrompt] = useState('');
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [results, setResults] = useState(null);
+            const [showDetectionPanel, setShowDetectionPanel] = useState(false);
+            const [isDark, setIsDark] = useState(() => {
+                const savedTheme = localStorage.getItem('theme');
+                return savedTheme ? savedTheme === 'dark' : true;
+            });
+            const [realtimeEntities, setRealtimeEntities] = useState([]);
+            const [isEntityProcessing, setIsEntityProcessing] = useState(false);
+
+            useEffect(() => {
+                document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            }, [isDark]);
+
+            const toggleTheme = () => setIsDark(!isDark);
+
+            // Debounced entity detection for real-time highlighting
+            const debouncedEntityDetection = _.debounce(async (text) => {
+                if (!text.trim()) {
+                    setRealtimeEntities([]);
+                    setIsEntityProcessing(false);
+                    return;
+                }
+
+                setIsEntityProcessing(true);
+                try {
+                    const response = await fetch('/entities', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Entities received:', data); // Debug log
+                        setRealtimeEntities(data || []);
+                    }
+                } catch (error) {
+                    console.error('Real-time entity detection error:', error);
+                } finally {
+                    setIsEntityProcessing(false);
+                }
+            }, 500);
+
+            // Handle input changes
+            const handleInputChange = (e) => {
+                const newValue = e.target.value;
+                setPrompt(newValue);
+                
+                // Auto-resize textarea
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                
+                // Trigger real-time entity detection
+                if (newValue.trim()) {
+                    debouncedEntityDetection(newValue);
+                } else {
+                    setRealtimeEntities([]);
+                }
+            };
+
+            // Process prompt and fetch all results
+            const processPrompt = async () => {
+                if (isProcessing || !prompt.trim()) return;
+                
+                setIsProcessing(true);
+                try {
+                    const response = await fetch('/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: prompt.trim(), model: 'llama2' })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        setResults(data);
+                        setShowDetectionPanel(true);
+                        setShowInput(false);
+                        setPrompt('');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            // Display text with highlighted entities
+            const displayHighlightedText = (text, entities) => {
+                if (!text || entities.length === 0) return text;
+
+                const sortedEntities = [...entities].sort((a, b) => a.start - b.start);
+                let elements = [];
+                let lastIndex = 0;
+
+                sortedEntities.forEach((entity, index) => {
+                    if (entity.start >= 0 && entity.end <= text.length && entity.start < entity.end) {
+                        if (entity.start > lastIndex) {
+                            elements.push(text.substring(lastIndex, entity.start));
+                        }
+                        elements.push(
+                            <EntityHighlight key={index} entity={entity}>
+                                {entity.text}
+                            </EntityHighlight>
+                        );
+                        lastIndex = entity.end;
+                    }
+                });
+
+                if (lastIndex < text.length) {
+                    elements.push(text.substring(lastIndex));
+                }
+
+                return elements;
+            };
+
+            return (
+                <div className="flex h-screen theme-transition">
+                    <Sidebar 
+                        activeChatSpace={activeChatSpace} 
+                        onChatSpaceClick={setActiveChatSpace}
+                        isDark={isDark}
+                        onThemeToggle={toggleTheme}
+                    />
+                    
+                    <div className="flex-1 bg-dark-300 flex flex-col theme-transition">
+                        <div className="flex-1 flex flex-col justify-center items-center p-10 relative">
+                            {!results ? (
+                                <div className="text-center text-secondary">
+                                    <svg className="w-16 h-16 mx-auto mb-5 opacity-50" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L19 6.5C18.5 4.9 17.5 3.5 16.1 2.4L17 1L15.6 0L14.1 1.5C12.9 1 11.4 1 10.1 1.5L8.6 0L7.2 1L8.1 2.4C6.7 3.5 5.7 4.9 5.2 6.5L3 7V9L5.2 9.5C5.7 11.1 6.7 12.5 8.1 13.6L7.2 15L8.6 16L10.1 14.5C11.3 15 12.8 15 14.1 14.5L15.6 16L17 15L16.1 13.6C17.5 12.5 18.5 11.1 19 9.5L21 9ZM12 8C14.2 8 16 9.8 16 12S14.2 16 12 16S8 14.2 8 12S9.8 8 12 8Z"/>
+                                    </svg>
+                                    <div>Enter text to detect PII and get AI analysis</div>
+                                </div>
+                            ) : (
+                                <div className="text-center max-w-4xl mx-auto">
+                                    <div className="text-secondary mb-5">Paraphrase this:</div>
+                                    <div className="text-xl leading-relaxed mb-7">
+                                        {displayHighlightedText(results.original_prompt, results.entities)}
+                                    </div>
+                                    <div className="inline-flex items-center gap-3 px-5 py-3 bg-yellow-600/20 border border-yellow-600/40 rounded-full text-yellow-500 text-sm font-semibold mb-8">
+                                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                                        </svg>
+                                        <span>{results.entities.length > 0 ? 'PII Detected' : 'No PII Detected'}</span>
+                                        <div className="bg-yellow-600/30 px-3 py-1 rounded-xl min-w-[24px] text-center">
+                                            {results.entities.length}
+                                        </div>
+                                    </div>
+                                    <div className="text-left">
+                                        <h2 className="text-base font-semibold text-primary mb-4">Analysis</h2>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <span className="font-medium">Sentiment: </span>
+                                                <span className={`${
+                                                    results.sentiment === 'Positive' ? 'text-green-500' :
+                                                    results.sentiment === 'Negative' ? 'text-red-500' :
+                                                    'text-gray-500'
+                                                }`}>
+                                                    {results.sentiment}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="font-medium">Summary: </span>
+                                                <span>{results.summary || 'No summary available'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <button 
+                                onClick={() => setShowInput(!showInput)}
+                                className="absolute bottom-10 right-10 w-14 h-14 bg-gradient-to-br from-primary to-primary-dark rounded-full flex items-center justify-center shadow-lg shadow-primary/30 hover:translate-y-[-2px] transition-all"
+                            >
+                                <svg className="w-6 h-6 text-dark-400" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        {showDetectionPanel && results && (
+                            <DetectionPanel 
+                                entities={results.entities} 
+                                onClose={() => setShowDetectionPanel(false)} 
+                            />
+                        )}
+                        
+                        {showInput && (
+                            <div className="bg-dark-200 border-t border-dark-100 p-5 theme-transition">
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex gap-3">
+                                        <textarea
+                                            value={prompt}
+                                            onChange={handleInputChange}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    processPrompt();
+                                                }
+                                            }}
+                                            placeholder="Enter text to analyze for PII..."
+                                            className="flex-1 bg-dark-300 border border-dark-100 rounded-xl px-4 py-4 text-primary placeholder-secondary focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none min-h-[56px] max-h-[120px] theme-transition"
+                                            style={{ height: '56px' }}
+                                        />
+                                        <SendButton 
+                                            onClick={processPrompt}
+                                            isDisabled={isProcessing || !prompt.trim()}
+                                            isLoading={isProcessing}
+                                        />
+                                    </div>
+                                    
+                                    {/* Real-time entity preview */}
+                                    {prompt.trim() && (
+                                        <div className="bg-dark-300 rounded-xl p-4 border border-dark-100">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="text-sm font-medium text-secondary">
+                                                    Real-time PII Detection
+                                                </div>
+                                                {isEntityProcessing && (
+                                                    <div className="flex items-center gap-2 text-xs text-secondary">
+                                                        <LoadingSpinner size="small" />
+                                                        <span>Analyzing...</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="text-base leading-relaxed">
+                                                {displayHighlightedText(prompt, realtimeEntities)}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

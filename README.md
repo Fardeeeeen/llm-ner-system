@@ -169,8 +169,6 @@ Here are some screenshots demonstrating the system's functionality:
 ### Screenshot 3: Processing Results
 ![Processing Results](screenshots/Screenshot%20(34).png)
 
-![Demo Video](screenshots/PrivChat.mp4)
-
 
 ## Future Enhancements
 

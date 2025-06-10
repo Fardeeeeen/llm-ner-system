@@ -182,4 +182,4 @@ Here are some screenshots demonstrating the system's functionality:
 
 ## License
 
-This project is created for educational purposes as part of a coding challenge.
+This project is created as part of a coding challenge.
